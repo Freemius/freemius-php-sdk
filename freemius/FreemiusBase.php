@@ -36,7 +36,7 @@
 
 	abstract class Freemius_Api_Base
 	{
-		const VERSION = '1.0.3';
+		const VERSION = '1.0.4';
 		const FORMAT = 'json';
 
 		protected $_id;
@@ -66,7 +66,7 @@
 			return $this->_sandbox;
 		}
 
-		protected function CanonizePath($pPath)
+		function CanonizePath($pPath)
 		{
 			$pPath = trim($pPath, '/');
 			$query_pos = strpos($pPath, '?');
@@ -80,7 +80,7 @@
 			// Trim '.json' suffix.
 			$format_length = strlen('.' . self::FORMAT);
 			$start = $format_length * (-1); //negative
-			if (substr($pPath, $start) === ('.' . self::FORMAT))
+			if (substr(strtolower($pPath), $start) === ('.' . self::FORMAT))
 				$pPath = substr($pPath, 0, strlen($pPath) - $format_length);
 
 			switch ($this->_scope) {

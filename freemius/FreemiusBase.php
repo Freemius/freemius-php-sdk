@@ -108,14 +108,14 @@
 			       ((false === strpos($pPath, '.')) ? '.' . self::FORMAT : '') . $query;
 		}
 
-		abstract function MakeRequest($pCanonizedPath, $pMethod = 'GET', $pParams = array());
+		abstract function MakeRequest($pCanonizedPath, $pMethod = 'GET', $pParams = array(), $pFileParams = array());
 
-		private function _Api($pPath, $pMethod = 'GET', $pParams = array())
+		private function _Api($pPath, $pMethod = 'GET', $pParams = array(), $pFileParams = array())
 		{
 			$pMethod = strtoupper($pMethod);
 
 			try {
-				$result = $this->MakeRequest($pPath, $pMethod, $pParams);
+				$result = $this->MakeRequest($pPath, $pMethod, $pParams, $pFileParams);
 			}
 			catch (Freemius_Exception $e)
 			{
@@ -161,9 +161,9 @@
 			return ($time - strtotime($pong->timestamp));
 		}
 
-		public function Api($pPath, $pMethod = 'GET', $pParams = array())
+		public function Api($pPath, $pMethod = 'GET', $pParams = array(), $pFileParams = array())
 		{
-			return $this->_Api($this->CanonizePath($pPath), $pMethod, $pParams);
+			return $this->_Api($this->CanonizePath($pPath), $pMethod, $pParams, $pFileParams);
 		}
 
 		/**

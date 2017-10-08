@@ -41,9 +41,7 @@
 			CURLOPT_RETURNTRANSFER => true,
 			CURLOPT_TIMEOUT        => 60,
 			CURLOPT_USERAGENT      => FS_SDK__USER_AGENT,
-			CURLOPT_HTTPHEADER     => array(
-				'Content-Type: application/json',
-			)
+			CURLOPT_HTTPHEADER     => array()
 		);
 
 		/**
@@ -90,9 +88,11 @@
 		 *      Authorization: FS {scope_entity_id}:{scope_entity_public_key}:base64encode(sha256(string_to_sign, {scope_entity_secret_key}))
 		 *
 		 * @param string $pResourceUrl
-		 * @param array $opts
+		 * @param array  $opts
+		 * @param string $pJsonEncodedParams
+		 * @param string $pContentType
 		 */
-		protected function SignRequest($pResourceUrl, &$opts)
+		protected function SignRequest($pResourceUrl, &$opts, $pJsonEncodedParams, $pContentType)
 		{
 			$eol = "\n";
 			$content_md5 = '';
@@ -101,7 +101,9 @@
 
 			if (isset($opts[CURLOPT_POST]) && 0 < $opts[CURLOPT_POST])
 			{
-				$content_md5 = md5($opts[CURLOPT_POSTFIELDS]);
+			    if ( ! empty($pJsonEncodedParams))
+    				$content_md5 = md5($pJsonEncodedParams);
+
 				$opts[CURLOPT_HTTPHEADER][] = 'Content-MD5: ' . $content_md5;
 			}
 
@@ -110,7 +112,7 @@
 			$string_to_sign = implode($eol, array(
 				$opts[CURLOPT_CUSTOMREQUEST],
 				$content_md5,
-				'application/json',
+                $pContentType,
 				$date,
 				$pResourceUrl
 			));
@@ -130,13 +132,14 @@
 		 *
 		 * @param $pCanonizedPath The URL to make the request to
 		 * @param string $pMethod HTTP method
-		 * @param array $params The parameters to use for the POST body
+		 * @param array $pParams The parameters to use for the POST body
+		 * @param array $pFileParams
 		 * @param null $ch Initialized curl handle
 		 *
 		 * @return mixed
 		 * @throws Freemius_Exception
 		 */
-		public function MakeRequest($pCanonizedPath, $pMethod = 'GET', $params = array(), $ch = null)
+		public function MakeRequest($pCanonizedPath, $pMethod = 'GET', $pParams = array(), $pFileParams = array(), $ch = null)
 		{
 			if (!$ch)
 				$ch = curl_init();
@@ -146,27 +149,53 @@
 			if (!is_array($opts[CURLOPT_HTTPHEADER]))
 				$opts[CURLOPT_HTTPHEADER] = array();
 
+			$content_type        = 'application/json';
+            $json_encoded_params = empty($pParams) ?
+                '' :
+                json_encode($pParams);
+
 			if ('POST' === $pMethod || 'PUT' === $pMethod)
 			{
-				if (is_array($params) && 0 < count($params)) {
-					$opts[ CURLOPT_POST ]       = count( $params );
-					$opts[ CURLOPT_POSTFIELDS ] = json_encode( $params );
+                if ( ! empty($pFileParams))
+                {
+                    $data = empty($json_encoded_params) ?
+                        '' :
+                        array('data' => $json_encoded_params);
+
+                    $json_encoded_params = '';
+
+                    $boundary     = ('----' . uniqid());
+                    $post_fields  = $this->GenerateMultipartBody($data, $pFileParams, $boundary);
+                    $content_type = "multipart/form-data; boundary={$boundary}";
+                }
+                else
+                {
+                    $post_fields = $json_encoded_params;
+                }
+
+                if (is_array($pParams) && 0 < count($pParams)) {
+					$opts[ CURLOPT_POST ]       = count( $pParams );
+					$opts[ CURLOPT_POSTFIELDS ] = $post_fields;
 				}
 
 				$opts[CURLOPT_RETURNTRANSFER] = true;
 			}
 
-			$opts[CURLOPT_URL] = $this->GetUrl($pCanonizedPath);
+            $opts[CURLOPT_HTTPHEADER][] = "Content-Type: $content_type";
+
+            $request_url = $this->GetUrl($pCanonizedPath);
+
+			$opts[CURLOPT_URL] = $request_url;
 			$opts[CURLOPT_CUSTOMREQUEST] = $pMethod;
 
 			$resource = explode('?', $pCanonizedPath);
-			$this->SignRequest($resource[0], $opts);
+			$this->SignRequest($resource[0], $opts, $json_encoded_params, $content_type);
 
 			// disable the 'Expect: 100-continue' behaviour. This causes CURL to wait
 			// for 2 seconds if the server does not support this header.
 			$opts[CURLOPT_HTTPHEADER][] = 'Expect:';
 
-			if ('https' === substr(strtolower($pCanonizedPath), 0, 5))
+			if ('https' === substr(strtolower($request_url), 0, 5))
 			{
 				$opts[CURLOPT_SSL_VERIFYHOST] = false;
 				$opts[CURLOPT_SSL_VERIFYPEER] = false;
@@ -222,4 +251,69 @@
 
 			return $result;
 		}
+
+        /**
+         * @param array  $pParams
+         * @param array  $pFileParams
+         * @param string $pBoundary
+         *
+         * @return string
+         */
+		private function GenerateMultipartBody($pParams, $pFileParams, $pBoundary)
+        {
+            $body = '';
+
+            if ( ! empty($pParams))
+            {
+                foreach ($pParams as $name => $value) {
+                    $body = ('--' . $pBoundary . PHP_EOL) .
+                        ("Content-Disposition: form-data; name=\"{$name}\"" . PHP_EOL) .
+                        PHP_EOL .
+                        ($value . PHP_EOL);
+                }
+            }
+
+            foreach ($pFileParams as $name => $file_path) {
+                $filename = basename($file_path);
+
+                $body .=
+                    ('--' . $pBoundary . PHP_EOL) .
+                    ("Content-Disposition: form-data; name=\"{$name}\"; filename=\"{$filename}\"" . PHP_EOL) .
+                    ('Content-Type: ' . $this->GetMimeContentType(strtolower($filename)) . PHP_EOL) .
+                    PHP_EOL .
+                    (file_get_contents($file_path) . PHP_EOL);
+            }
+
+            $body .= ('--' . $pBoundary . '--');
+
+            return $body;
+        }
+
+        /**
+         * @param string $pFilename
+         *
+         * @return string
+         *
+         * @throws Exception
+         */
+        private function GetMimeContentType($pFilename)
+        {
+            if (function_exists('mime_content_type'))
+                return mime_content_type($pFilename);
+
+            $mime_types = array(
+                'zip'  => 'application/zip',
+                'jpg'  => 'image/jpeg',
+                'jpeg' => 'image/jpeg',
+                'png'  => 'image/png',
+                'gif'  => 'image/gif',
+            );
+
+            $ext = explode('.', $pFilename)[1];
+
+            if ( ! isset($mime_types[$ext]))
+                throw new Exception('Unknown file type');
+
+            return $mime_types[$ext];
+        }
 	}

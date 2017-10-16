@@ -279,7 +279,7 @@
                 $body .=
                     ('--' . $pBoundary . PHP_EOL) .
                     ("Content-Disposition: form-data; name=\"{$name}\"; filename=\"{$filename}\"" . PHP_EOL) .
-                    ('Content-Type: ' . $this->GetMimeContentType(strtolower($filename)) . PHP_EOL) .
+                    ('Content-Type: ' . $this->GetMimeContentType($file_path) . PHP_EOL) .
                     PHP_EOL .
                     (file_get_contents($file_path) . PHP_EOL);
             }

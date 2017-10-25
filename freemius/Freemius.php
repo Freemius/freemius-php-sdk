@@ -88,29 +88,55 @@
 		 *      Authorization: FS {scope_entity_id}:{scope_entity_public_key}:base64encode(sha256(string_to_sign, {scope_entity_secret_key}))
 		 *
 		 * @param string $pResourceUrl
+		 * @param string $pMethod
 		 * @param array  $opts
 		 * @param string $pJsonEncodedParams
 		 * @param string $pContentType
 		 */
-		protected function SignRequest($pResourceUrl, &$opts, $pJsonEncodedParams, $pContentType)
+		protected function SignRequest($pResourceUrl, $pMethod, &$opts, $pJsonEncodedParams, $pContentType)
 		{
-			$eol = "\n";
+			$auth = $this->GenerateAuthorizationParams(
+				$pResourceUrl,
+				$pMethod,
+				$pJsonEncodedParams,
+				$pContentType
+			);
+
+			$opts[CURLOPT_HTTPHEADER][] = ('Date: ' . $auth['date']);
+
+			// Add authorization header.
+			$opts[CURLOPT_HTTPHEADER][] = ('Authorization: ' . $auth['authorization']);
+
+			if ( ! empty($auth['content_md5']))
+				$opts[CURLOPT_HTTPHEADER][] = ('Content-MD5: ' . $auth['content_md5']);
+		}
+
+		/**
+		 * @param string $pResourceUrl
+		 * @param string $pMethod
+		 * @param string $pJsonEncodedParams
+		 * @param string $pContentType
+		 *
+		 * @return array
+		 */
+		private function GenerateAuthorizationParams(
+			$pResourceUrl,
+			$pMethod = 'GET',
+			$pJsonEncodedParams = '',
+			$pContentType = ''
+		) {
+			$pMethod = strtoupper($pMethod);
+
+			$eol         = "\n";
 			$content_md5 = '';
-			$now = (time() - self::$_clock_diff);
-			$date = date('r', $now);
+			$now         = (time() - self::$_clock_diff);
+			$date        = date('r', $now);
 
-			if (isset($opts[CURLOPT_POST]) && 0 < $opts[CURLOPT_POST])
-			{
-			    if ( ! empty($pJsonEncodedParams))
-    				$content_md5 = md5($pJsonEncodedParams);
-
-				$opts[CURLOPT_HTTPHEADER][] = 'Content-MD5: ' . $content_md5;
-			}
-
-			$opts[CURLOPT_HTTPHEADER][] = 'Date: ' . $date;
+			if (in_array($pMethod, array('POST', 'PUT')) && ! empty($pJsonEncodedParams))
+				$content_md5 = md5($pJsonEncodedParams);
 
 			$string_to_sign = implode($eol, array(
-				$opts[CURLOPT_CUSTOMREQUEST],
+				$pMethod,
 				$content_md5,
                 $pContentType,
 				$date,
@@ -121,8 +147,40 @@
 			// the signature uses public key hash encoding.
 			$auth_type = ($this->_secret !== $this->_public) ? 'FS' : 'FSP';
 
-			// Add authorization header.
-			$opts[CURLOPT_HTTPHEADER][] = 'Authorization: ' . $auth_type . ' ' . $this->_id . ':' . $this->_public . ':' . self::Base64UrlEncode(hash_hmac('sha256', $string_to_sign, $this->_secret));
+			$auth = array(
+				'date'          => $date,
+				'authorization' => $auth_type . ' ' . $this->_id . ':' .
+					$this->_public . ':' .
+					self::Base64UrlEncode(hash_hmac(
+						'sha256', $string_to_sign, $this->_secret
+					))
+			);
+
+			if ( ! empty($content_md5))
+				$auth['content_md5'] = $content_md5;
+
+			return $auth;
+		}
+
+		/**
+		 * @param string $pPath
+		 *
+		 * @return string
+		 */
+		function GetSignedUrl($pPath)
+		{
+			$resource     = explode('?', $this->CanonizePath($pPath));
+			$pResourceUrl = $resource[0];
+
+			$auth = $this->GenerateAuthorizationParams($pResourceUrl);
+
+			return $this->GetUrl(
+				$pResourceUrl . '?' .
+				(1 < count($resource) && ! empty($resource[1]) ? $resource[1] . '&' : '') .
+				http_build_query(array(
+					'auth_date'     => $auth['date'],
+					'authorization' => $auth['authorization']
+				)));
 		}
 
 		/**
@@ -154,6 +212,8 @@
                 '' :
                 json_encode($pParams);
 
+            $overidden_method = $pMethod;
+
 			if ('POST' === $pMethod || 'PUT' === $pMethod)
 			{
                 if ( ! empty($pFileParams))
@@ -167,6 +227,15 @@
                     $boundary     = ('----' . uniqid());
                     $post_fields  = $this->GenerateMultipartBody($data, $pFileParams, $boundary);
                     $content_type = "multipart/form-data; boundary={$boundary}";
+
+                    if ('PUT' === $pMethod)
+					{
+						$query = parse_url($pCanonizedPath, PHP_URL_QUERY);
+						$pCanonizedPath .= (is_string($query) ? '&' : '?') . 'method=PUT';
+
+						$overidden_method = $pMethod;
+						$pMethod          = 'POST';
+					}
                 }
                 else
                 {
@@ -189,7 +258,7 @@
 			$opts[CURLOPT_CUSTOMREQUEST] = $pMethod;
 
 			$resource = explode('?', $pCanonizedPath);
-			$this->SignRequest($resource[0], $opts, $json_encoded_params, $content_type);
+			$this->SignRequest($resource[0], $overidden_method, $opts, $json_encoded_params, $content_type);
 
 			// disable the 'Expect: 100-continue' behaviour. This causes CURL to wait
 			// for 2 seconds if the server does not support this header.

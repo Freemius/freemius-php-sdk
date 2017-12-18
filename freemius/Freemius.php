@@ -31,6 +31,10 @@
     if ( ! defined('FS_API__SANDBOX_ADDRESS'))
         define('FS_API__SANDBOX_ADDRESS', FS_API__PROTOCOL . '://sandbox-api.freemius.com');
 
+    if ( class_exists( 'Freemius_Api' ) ) {
+        return;
+    }
+
     class Freemius_Api extends Freemius_Api_Base
     {
         /**

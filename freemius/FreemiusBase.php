@@ -103,6 +103,9 @@
 				case 'developer':
 					$base = '/developers/' . $this->_id;
 					break;
+				case 'store':
+					$base = '/stores/' . $this->_id;
+					break;
 				case 'user':
 					$base = '/users/' . $this->_id;
 					break;

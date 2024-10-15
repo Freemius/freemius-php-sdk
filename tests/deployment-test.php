@@ -8,7 +8,7 @@
     define( 'FS__API_SECRET_KEY', 'sk_YOUR_SECRET_KEY' );
 
     // Init SDK.
-    $api = new Freemius_Api(FS__API_SCOPE, FS__API_ID, FS__API_PUBLIC_KEY, FS__API_SECRET_KEY);
+    $api = new Freemius_Api(FS__API_SCOPE, FS__API_ENTITY_ID, FS__API_PUBLIC_KEY, FS__API_SECRET_KEY);
 
     // Deploy new version.
     $tag = $api->Api('plugins/115/tags.json', 'POST', array(

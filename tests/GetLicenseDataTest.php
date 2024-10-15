@@ -2,8 +2,8 @@
 /**
  * How to set up and run tests:
  *
- * 1. Install PHPUnit via Composer:
- *    composer require --dev phpunit/phpunit
+ * 1. Install dependencies via Composer:
+ *    composer install
  *
  * 2. Copy the `credentials.example.php` file to `credentials.php` and fill in your actual credentials:
  *    cp tests/credentials.example.php tests/credentials.php
@@ -18,18 +18,14 @@ class GetLicenseDataTest extends TestCase
 {
     public function testLicenseData()
     {
-        require_once 'credentials.php';
-        require_once '../freemius/FreemiusBase.php';
-        require_once '../freemius/Freemius.php';
-
         $api = new Freemius_Api(
             FS__API_SCOPE,
-            FS__API_ID,
+            FS__API_ENTITY_ID,
             FS__API_PUBLIC_KEY,
             FS__API_SECRET_KEY
         );
 
-        $license_key = 'sk_rr_s^T6x3aT^vpE-teFhtgZXjjhk3';
+        $license_key = FS__TEST_VALID_LICENSE_KEY;
 
         $result = $api->Api("/licenses.json", "GET", array(
             'search' => ($license_key),

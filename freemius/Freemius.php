@@ -251,6 +251,9 @@
                     }
 
                     $opts[CURLOPT_RETURNTRANSFER] = true;
+                } else if ( 'GET' === $pMethod && ! empty( $pParams ) ) {
+                    $query_string   = http_build_query( $pParams );
+                    $pCanonizedPath .= ( strpos( $pCanonizedPath, '?' ) === false ? '?' : '&' ) . $query_string;
                 }
 
                 $opts[CURLOPT_HTTPHEADER][] = "Content-Type: $content_type";

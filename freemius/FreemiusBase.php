@@ -174,6 +174,21 @@
                 return ($time - strtotime($pong->timestamp));
             }
 
+            /**
+             * Add query parameters to the path.
+             *
+             * @param string $pPath   Path.
+             * @param array  $pParams Query parameters.
+             *
+             * @return string Path with query parameters.
+             */
+            protected function AddQueryParams($pPath, $pParams)
+            {
+                $query_string = http_build_query($pParams);
+
+                return $pPath . (strpos($pPath, '?') === false ? '?' : '&') . $query_string;
+            }
+
             public function Api($pPath, $pMethod = 'GET', $pParams = array(), $pFileParams = array())
             {
                 return $this->_Api($this->CanonizePath($pPath), $pMethod, $pParams, $pFileParams);

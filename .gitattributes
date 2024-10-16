@@ -1,6 +1,4 @@
 # Items to ignore when downloading a zip
 .gitattributes export-ignore
 /tests/ export-ignore
-
-# Declare files that will always have CRLF line endings on checkout.
-#*.php text eol=crlf
+phpunit.xml export-ignore

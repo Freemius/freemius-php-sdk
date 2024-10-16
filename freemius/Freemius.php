@@ -252,6 +252,10 @@
 
                     $opts[CURLOPT_RETURNTRANSFER] = true;
                 }
+                else if ('GET' === $pMethod && ! empty($pParams))
+                {
+                    $pCanonizedPath = $this->AddQueryParams($pCanonizedPath, $pParams);
+                }
 
                 $opts[CURLOPT_HTTPHEADER][] = "Content-Type: $content_type";
 

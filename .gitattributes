@@ -1,0 +1,4 @@
+# Items to ignore when downloading a zip
+.gitattributes export-ignore
+/tests/ export-ignore
+phpunit.xml export-ignore
